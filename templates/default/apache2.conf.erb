@@ -1,0 +1,61 @@
+<% if node['nagios']['enable_ssl'] -%>
+<VirtualHost *:80>
+        ServerAdmin     <%= node['nagios']['sysadmin_email'] %>
+        ServerName      <%= node['fqdn'] %>
+        ServerAlias     nagios nagios.<%= node.chef_environment =~ /_default/ ? "default" : node.chef_environment %>.<%= @public_domain %>
+        RedirectMatch ^/(.*)$ https://<%= node['fqdn'] %>/$1
+</VirtualHost>
+<% end -%>
+
+
+<VirtualHost *:<%= node['nagios']['http_port'] %>>
+  ServerAdmin     <%= node['nagios']['sysadmin_email'] %>
+  ServerName      <%= node['fqdn'] %>
+  ServerAlias     nagios nagios.<%= node.chef_environment =~ /^_default$/ ? "default" : node.chef_environment%>.<%= @public_domain %>
+  DocumentRoot    <%= node['nagios']['docroot'] %>
+  CustomLog       <%= node['nagios']['log_dir'] %>/apache_access.log combined
+  ErrorLog        <%= node['nagios']['log_dir'] %>/apache_error.log
+
+  ScriptAlias /cgi-bin/nagios3 /usr/lib/cgi-bin/nagios3
+  ScriptAlias /cgi-bin /usr/lib/cgi-bin/nagios3
+
+  
+  Alias /stylesheets /etc/nagios3/stylesheets
+
+  <% if node['nagios']['enable_ssl'] -%>
+  SSLEngine On
+  SSLCertificateFile <%= node['apache']['dir']%>/ssl/nimbuzz.crt
+  SSLCertificateKeyFile <%= node['apache']['dir']%>/ssl/nimbuzz.key
+  <% end -%>
+
+
+<% case node['nagios']['server_auth_method'] -%>
+<% when "openid" -%>
+  <Location />
+    AuthName "Nagios <%= node.chef_environment %> Server"
+    AuthType OpenID
+    require user <%= node['apache']['allowed_openids'].join(' ') %>
+    AuthOpenIDDBLocation <%= node['apache']['mod_auth_openid']['dblocation'] %>
+  </Location>
+<% when "ldap" -%>
+  <Location / >
+    AuthName "Nagios <%= node.chef_environment %> Server"
+    AuthType basic
+    AuthBasicProvider ldap
+    AuthLDAPURL <%= @ldap_url %>/ou=users,dc=nimbuzz,dc=com?uid?one?(objectClass=person)
+    require valid-user
+  </Location>
+<% else -%>
+  <Location />
+    AuthName "Nagios <%= node.chef_environment %> Server"
+    AuthType Basic
+    AuthUserFile "<%= node['nagios']['conf_dir'] %>/htpasswd.users"
+    require valid-user
+  </Location>
+<% end -%>
+
+  RewriteEngine On
+  RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /.*index\.html\ HTTP/
+  RewriteRule ^(.*)index\.html$ $1 [R=301,L]
+</VirtualHost>
+
