@@ -1,7 +1,7 @@
 Description
 ===========
 
-Installs and configures Nagios 3 for a server and for clients using Chef search capabilities.
+Installs and configures Nagios 3 for a server and using Chef search capabilities and PNP4Nagios
 
 Changes
 =======
